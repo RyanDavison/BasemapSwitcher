@@ -1,214 +1,192 @@
 <!doctype html>
-
 <html lang="en">
-
 <head>
 
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=7, IE=9, IE=10">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="translucent-black">
 
- <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
- <meta http-equiv="X-UA-Compatible" content="IE=7, IE=9, IE=10">
- <meta name="viewport" content="width=device-width, initial-scale=1">
- <meta name="apple-mobile-web-app-capable" content="yes">
- <meta name="apple-mobile-web-app-status-bar-style" content="translucent-black">
+    <title>Custom Basemap Switcher</title>
 
- <title>Custom Basemap Switcher</title>
+    <script src="http://js.arcgis.com/3.7/"></script>
 
- <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
- <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
- <script src="http://js.arcgis.com/3.7/"></script>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/dojo/dijit/themes/nihilo/nihilo.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/esri/css/esri.css">
 
+    <style>
+        html, body, #map
+        {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
 
- <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/overcast/jquery-ui.css" />
- <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/dojo/dijit/themes/nihilo/nihilo.css">
- <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/esri/css/esri.css">
+        #map
+        {
+            position: fixed;
+        }
 
- <style>
-  html, body{
-   height: 100%;
-   width: 99.9%;
-   margin: 0;
-   padding: 0;
-   overflow:hidden;
-  }
+        #basemapButton
+        {
+            position: absolute;
+            top: 25px;
+            left: 70px;
+            z-index: 100;
+        }
 
-  #map{
-   width: 100%;
-   height: 100%;
-   position: fixed;
-   padding: 0;
-  }
+        button
+        {
+            border-radius: 4px;
+            background-color: #F1F1F1;
+            font-size: 1em;
+            color: #33A7DE;
+        }
 
-  #toolbar{
-   width: 100%;
-   margin: 0 auto;
-   border:none;
-  }
+        #basemapDialog
+        {
+            background: white;
+            display: none;
+            font-size: 0.75em;
+            height: 200px;
+            left: 65px;
+            position: absolute;
+            top: 70px;
+            width: 300px;
+            border: 0.5px solid black;
+            border-radius: 5px;
+        }
 
-  #headerButtonGroup{
-   position: relative;
-   width: 99.5%;
-   margin: 0 auto;
-   margin-top: 0.25em;
-   margin-bottom: 0.25em;
-   margin-left: 0.5em;
-   z-index:100;
-  }
+            #basemapDialog ul, li
+            {
+                list-style: none;
+                margin-top: 1em;
+            }
 
-  #basemapDialog ul{
-   list-style:none;
-  }
+        a img
+        {
+            border: 1px solid black;
+        }
 
-  a img{
-   border: 1px solid black;
-  }
+        a:hover img
+        {
+            border: 1px solid white;
+        }
+    </style>
+    <script>
+        require([
+            "esri/map",
+            "esri/layers/ArcGISTiledMapServiceLayer",
+            "esri/geometry/Extent",
+            "dojo/dom",
+            "dojo/dom-attr",
+            "dojo/dom-prop",
+            "dojo/on",
+            "dojo/query",
+            "dojo/NodeList-traverse"
+        ], function (
+            Map, ArcGISTiledMapServiceLayer, Extent, dom, domAttr, domProp, on, query
+          ) {
+            //We can set an extent like this one which takes us to Las Vegas, NV
+            var initialExtent = new Extent(-115.68, 35.77, -114.75, 36.45);
 
-  a:hover img{
-   border: 1px solid white;
-  }
+            //Create an empty array to store a reference to the currently selected basemap layer
+            currentBasemap = []
 
-  #message{
-   display:none;
-  }
+            map = new Map("map", {
+                extent: initialExtent,
+                logo: false,
+                slider: true
+            });
 
- </style>
+            //create references to all of your basemap layers but only add one to the map initially
+            imagery = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer");
+            //add the current basemap layer to the currentBasemap array so you can keep track of what is active.
+            currentBasemap.push(imagery);
+            map.addLayer(imagery);
+            //call reorderLayer on the map object and set your basemap to zero every time you change basemaps. This ensures that your basemap is always the bottom layer.
+            map.reorderLayer(imagery, 0);
 
-  <script>
+            street = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer");
+            topo = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
+            relief = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer");
 
-require([
-     "esri/map",
-     "esri/layers/ArcGISTiledMapServiceLayer",
-     "esri/geometry/Extent"
-   ], function (
-     Map, ArcGISTiledMapServiceLayer, Extent
-   ) {
-     //We can set an extent like this one which takes us to Las Vegas, NV
-     var initialExtent = new Extent(-115.68, 35.77, -114.75, 36.45);
-     //Create an empty array to store a reference to the currently selected basemap layer
-     currentBasemap = []
-     map = new Map("map", {
-       extent: initialExtent,
-       logo: false,
-       slider: true
-     });
-     //create references to all of your basemap layers but only add one to the map initially
-     imagery = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer");
-     //add the current basemap layer to the currentBasemap array so you can keep track of what is active.
-     currentBasemap.push(imagery);
-     map.addLayer(imagery);
-     //call reorderLayer on the map object and set your basemap to zero every time you change basemaps. This ensures that your basemap is always the bottom layer.
-     map.reorderLayer(imagery, 0);
-     street = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer");
-     topo = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
-     relief = new ArcGISTiledMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer");
-   });
-   $(function () {
-     $("#basemapDialog").dialog({
-       position: {
-         my: "left+20% top+5%",
-         at: "left bottom",
-         of: "#headerButtonGroup"
-       },
-       autoOpen: false,
-       show: {
-         effect: "blind",
-         duration: 0
-       },
-       hide: {
-         effect: "blind",
-         duration: 0
-       }
-     });
-     //Opens and closes the basemap dialog using the basemaps button or the dialog close x
-     $("#basemapButton").button().click(function () {
-       if ($("#basemapDialog").dialog("isOpen")) {
-         $("#basemapDialog").dialog("close");
-       } else {
-         $("#basemapDialog").dialog("open");
-       };
-     });
-   });
-    //This helper function is just to reset the select dropdown to its default "None Selected" state when a basemap is chosen using a button or thumbnail. Of course
-    //you wouldn't need this function at all if you were not using an html select dropdown for your basemaps.
-   function selectReset() {
-     var firstOption = $("option[value=none]")
-     var html = $("<div>").append(firstOption.clone()).html();
-     html = html.replace(/\>/, ' selected="selected">');
-     firstOption.replaceWith(html);
-   }
-    //This function does just what its name says and changes the layer
-   function changeLayer(layerName) {
-     map.removeLayer(currentBasemap[0])
-     currentBasemap.length = 0;
-     currentBasemap.push(layerName)
-     map.addLayer(layerName)
-     map.reorderLayer(layerName, 0);
-   }
-    //Here is where we switch the basemap using a button
-   $(function () {
-     $("#streetView").click(function () {
-       selectReset();
-       changeLayer(street)
-     });
-   });
-    //Here is where we switch the basemap using a thumbnail image
-   $(function () {
-     $("#wldImagery").button().click(function () {
-       selectReset();
-       changeLayer(imagery)
-     });
-   });
-    //Here is the code for handling changing your basemap based on a html select box dropdown.
-   $(function () {
-     $('#bmSelect').change(function () {
-       var newBasemap = $("#bmSelect").val()
-       //Default to the imagery basemap if "none Selected" is the choice in the dropdown 
-       if (newBasemap === "none") {
-         changeLayer(imagery)
-       } else {
-         //The following associative array allows you to map the dropdown values with an object reference to the tiled service layers created above
-         var bmList = ({
-           "topo": topo,
-           "relief": relief
-         })
-         //Find the selected basemap in the array above and use the associated object to add the selected theme layer to the map
-         for (var x in bmList) {
-           if (x === newBasemap) {
-             changeLayer(bmList[x])
-           }
-         }
-       }
-     });
-   });
+            //Opens and closes the basemap dialog using the basemaps button or the dialog close x
+            on(dom.byId("basemapButton"), "click", function () {
+                if (!(dom.byId("basemapDialog").style.display == 'block')) {
+                    dom.byId("basemapDialog").style.display = "block";
+                } else {
+                    dom.byId("basemapDialog").style.display = 'none';
+                }
+            });
 
-</script>
+            //This function does just what its name says and changes the layer
+            function changeLayer(layerName) {
+                map.removeLayer(currentBasemap[0])
+                currentBasemap.length = 0;
+                currentBasemap.push(layerName)
+                map.addLayer(layerName)
+                map.reorderLayer(layerName, 0);
+            }
 
+            //Here is where we switch the basemap using a button
+            on(dom.byId("streetView"), "click", function () {
+                domProp.set(query("#differentBase option")[0], "selected", true);
+                changeLayer(street)
+            });
 
+            //Here is where we switch the basemap using a thumbnail image
+            on(dom.byId("wldImagery"), "click", function () {
+                domProp.set(query("#differentBase option")[0], "selected", true);
+                changeLayer(imagery)
+            });
+
+            //Here is the code for handling changing your basemap based on a html select box dropdown.
+            dom.byId("bmSelect").onchange = function () {
+                var newBasemap = dom.byId("bmSelect").value
+
+                //Default to the imagery basemap if "none Selected" is the choice in the dropdown 
+                if (newBasemap === "none") {
+                    changeLayer(imagery)
+                } else {
+                    //The following allows you to map the dropdown values with an object reference to the tiled service layers created above
+                    var bmList = ({
+                        "topo": topo, "relief": relief
+                    })
+
+                    //Find the selected basemap in the array above and use the associated object to add the selected theme layer to the map
+                    for (var x in bmList) {
+                        if (x === newBasemap) {
+                            changeLayer(bmList[x])
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 
 </head>
- <body>
-  <div id="toolbar" class="ui-widget-header">
-   <div id="headerButtonGroup">
+<body class="container tundra">
     <button id="basemapButton" title="Open a basemap switching dialog">Switch Basemaps</button>
-   </div>
-  </div>
-  <div id="map"></div>
-  <div id="basemapDialog" title="Choose a Basemap">
-   <ul>
-    <li><button id="wldImagery" class="btn btn-primary btn-wide" title="Load the World Imagery layer as a basemap using this button">Imagery</button></li><br>
-    <li><a id="streetView"><img title="You can use an image thumbnail like this one to select a basemap" 
-         src="http://ryanrandom.com/examples/images/vegas.jpg" alt="Street Map View" height="50" width="50" />	Streets</a>
-    </li><br>
-    <li id="differentBase" title="View historical imagery as a basemap">Select basemap from dropdown:
-     <select name="bmSelect" id="bmSelect" autocomplete="off" title="Selecting a basemap from a dropdown is handy when you have many choices, like historical basemaps">
-       <option value="none">None Selected</option>
-       <option value="topo">Topo</option>
-       <option value="relief">Shaded Relief</option>
-     </select>
-    </li>
-   </ul>
-  </div>
- </body>
-</html>
-
-
-
+    <div id="map"></div>
+    <div id="basemapDialog" title="Choose a Basemap">
+        <ul>
+            <li>
+                <button id="wldImagery" title="Load the World Imagery layer as a basemap using this button">Imagery</button> Select by button</li>
+            <li><a id="streetView">
+                <img title="You can use an image thumbnail like this one to select a basemap" src="http://ryanrandom.com/examples/images/vegas.jpg" alt="Street Map View" height="50" width="50" />
+                </a> Select by thumbnail</li>
+            <li id="differentBase" title="View historical imagery as a basemap">
+                    		<select name="bmSelect" id="bmSelect" title="Selecting a basemap from a dropdown is handy when you have many choices, like historical basemaps">
+                                <option value="none" selected>None Selected</option>
+                                <option value="topo">Topo</option>
+                                <option value="relief">Shaded Relief</option>
+                            </select> Select by dropdown
+            </li>
+        </ul>
+    </div>
+</body>
+</html>
